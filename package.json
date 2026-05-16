@@ -1,0 +1,24 @@
+{
+  "name": "dsmhs-screener",
+  "version": "1.0.0",
+  "description": "DSMHS Node.js 강의용 API 점검 패키지",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "lib/",
+    "INSTRUCTOR_MANUAL.md",
+    "README.md"
+  ],
+  "keywords": [
+    "dsmhs",
+    "screener",
+    "education"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

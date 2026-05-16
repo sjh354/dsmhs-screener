@@ -1,0 +1,9 @@
+{
+  "project": "dsmhs-screener",
+  "last_modified": "2026-05-17",
+  "current_job": "패키지 전체 구현 완료 (package.json, lib/config.js, lib/register.js, lib/heartbeat.js, index.js, INSTRUCTOR_MANUAL.md, README.md, .npmignore)",
+  "next_job": "npm publish 실행: `npm login` 후 `npm publish` — npmjs.com에 공개 배포",
+  "report": {
+    "2026-05-17": "dsmhs-screener npm 패키지 전체 구현 완료. Task 1-7 모두 완료. package.json 초기화, config.js(환경변수 검증), register.js(10회 재시도 등록), heartbeat.js(30초 주기 전송), index.js(비동기 IIFE 진입점), INSTRUCTOR_MANUAL.md(강사 셋업 가이드), README.md, .npmignore 작성. npm pack --dry-run 검증 통과."
+  }
+}
