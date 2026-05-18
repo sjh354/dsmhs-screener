@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSMHS 학생 현황</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+    header {
+      background: #2563eb; color: #fff; padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    #refresh-info { font-size: 0.8rem; opacity: 0.8; }
+    main { padding: 24px; }
+    #stats { margin-bottom: 16px; font-size: 0.9rem; color: #555; }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #fff; border-radius: 10px; padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      border-left: 4px solid #e5e7eb;
+      transition: border-color .2s;
+    }
+    .card.alive { border-left-color: #22c55e; }
+    .card.offline { border-left-color: #ef4444; }
+    .card-name { font-weight: 600; font-size: 1rem; margin-bottom: 6px; }
+    .card-addr { font-size: 0.8rem; color: #666; margin-bottom: 8px; font-family: monospace; }
+    .card-status { font-size: 0.85rem; margin-bottom: 4px; }
+    .card-time { font-size: 0.75rem; color: #999; }
+    #empty { display: none; text-align: center; color: #aaa; padding: 60px 0; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DSMHS 학생 현황 대시보드</h1>
+    <span id="refresh-info">5초마다 자동 갱신</span>
+  </header>
+  <main>
+    <p id="stats"></p>
+    <div id="grid"></div>
+    <p id="empty">등록된 학생이 없습니다.</p>
+  </main>
+
+  <script>
+    async function refresh() {
+      const res = await fetch('/screener/students');
+      const students = await res.json();
+
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      const stats = document.getElementById('stats');
+
+      const alive = students.filter(s => s.alive).length;
+      stats.textContent = `총 ${students.length}명 중 🟢 ${alive}명 접속 중`;
+
+      if (students.length === 0) {
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      grid.innerHTML = students
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(s => {
+          const addr = s.port ? `${s.ip}:${s.port}` : s.ip;
+          const timeStr = new Date(s.lastSeenIso).toLocaleTimeString('ko-KR');
+          return `
+            <div class="card ${s.alive ? 'alive' : 'offline'}">
+              <div class="card-name">${s.name}</div>
+              <div class="card-addr">${addr}</div>
+              <div class="card-status">${s.alive ? '🟢 접속 중' : '🔴 오프라인'}</div>
+              <div class="card-time">마지막 확인: ${timeStr}</div>
+            </div>`;
+        })
+        .join('');
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

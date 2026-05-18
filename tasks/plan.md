@@ -1,169 +1,151 @@
-# Implementation Plan: dsmhs-screener
+# Plan: dsmhs-screener v1.1
 
-## Overview
-
-학생용 npm 패키지 `dsmhs-screener`와 강사용 메뉴얼을 제작한다.  
-패키지는 `require` 한 줄로 활성화되며, 강사 서버에 자동 등록 + heartbeat를 전송한다.
-
----
-
-## Dependency Graph
+## 의존성 그래프
 
 ```
-Task 1: package.json 초기화
-    │
-    ▼
-Task 2: lib/config.js  (환경변수 로드)
-    │
-    ├──▶ Task 3: lib/register.js  (등록 로직)
-    │         │
-    │         ▼
-    │    Task 4: lib/heartbeat.js  (heartbeat 스케줄러)
-    │         │
-    │         ▼
-    └──▶ Task 5: index.js  (진입점 — config + register + heartbeat 조합)
-              │
-              ▼
-         Task 6: INSTRUCTOR_MANUAL.md  (강사 메뉴얼, 독립 작성 가능)
-              │
-              ▼
-         Task 7: npm 배포 준비 (.npmignore, README, 최종 점검)
+lib/config.js (package.json 읽기)
+    └─▶ index.cjs / index.mjs (진입점)
+    └─▶ test/config.test.js (테스트 업데이트)
+
+lib/heartbeat.js (5초 변경 — 독립)
+
+package.json (exports/files/dependencies 업데이트)
+    └─▶ index.cjs (rename from index.js)
+    └─▶ index.mjs (신규)
+
+instructor-server/ (완전 신규 — 다른 태스크에 독립)
+    └─▶ server.js
+    └─▶ public/index.html
 ```
 
 ---
 
-## Tasks
+## 태스크 목록
 
-### Task 1 — package.json 초기화
+### Task 1: `lib/heartbeat.js` — 5초 간격으로 변경
 
-**목표**: 패키지 메타데이터 및 의존성 설정
+**변경 파일:** `lib/heartbeat.js`
 
-**작업**:
-- `npm init -y` 후 필드 수정
-- `name`, `version`, `main`, `description`, `keywords`, `license` 설정
-- `dependencies`: `dotenv`
-- `engines`: `{ "node": ">=18" }`
-- `files`: `["index.js", "lib/", "INSTRUCTOR_MANUAL.md", "README.md"]`
+**변경 내용:**
+- `intervalMs = 30000` → `intervalMs = 5000`
 
-**검증**: `node -e "require('./package.json')"` 오류 없음
-
----
-
-### Task 2 — lib/config.js
-
-**목표**: 환경변수 로드 및 검증
-
-**작업**:
-- `dotenv`로 `.env` 로드
-- `DSMHS_INSTRUCTOR_URL`, `DSMHS_STUDENT_NAME` 필수 확인
-- `DSMHS_PORT` 없으면 `process.env.PORT || 3000`
-- 누락 시 경고 메시지 출력 후 `enabled: false` 반환
-- 정상 시 `{ enabled: true, instructorUrl, studentName, port }` 반환
-
-**검증**:
-- 환경변수 없이 실행 → 경고 출력, `enabled: false`
-- 환경변수 설정 후 실행 → `enabled: true`, 올바른 값 반환
-
----
-
-### Task 3 — lib/register.js
-
-**목표**: 강사 서버에 학생 서버 등록
-
-**작업**:
-- Node.js 내장 `http`/`https` 모듈로 POST 요청 (외부 의존성 없음)
-- 요청 body: `{ name, ip, port, timestamp }`
-- IP 자동 감지: `os.networkInterfaces()`로 로컬 네트워크 IP 추출
-- 실패 시 1초 후 재시도, 최대 10회
-- 성공 시 `[dsmhs-screener] ✓ 강사 서버에 등록되었습니다. (이름)` 출력
-- 10회 모두 실패 시 `[dsmhs-screener] ✗ 강사 서버에 연결할 수 없습니다. 수동으로 확인하세요.` 출력
-
-**검증**:
-- 강사 서버 없는 상태에서 실행 → 10회 재시도 후 경고, 프로세스 크래시 없음
-- 강사 서버 mock 실행 후 → 등록 성공 메시지 출력
-
----
-
-### Task 4 — lib/heartbeat.js
-
-**목표**: 30초마다 heartbeat 전송
-
-**작업**:
-- `setInterval(30000)`으로 반복
-- 요청 body: `{ name, timestamp }`
-- 실패해도 콘솔 경고 없음 (조용히 재시도)
-- `startHeartbeat(config)` 함수 export
-- `process.on('exit')`에서 인터벌 정리
-
-**검증**:
-- 함수 호출 후 30초 내 두 번 이상 전송 확인 (간격 단축 테스트)
-- 강사 서버 다운 상태에서 프로세스 크래시 없음
-
----
-
-### Task 5 — index.js (진입점)
-
-**목표**: `require('dsmhs-screener')` 시 자동 실행
-
-**작업**:
-- `config.js` → `register.js` → `heartbeat.js` 순서로 호출
-- `config.enabled === false`이면 즉시 종료 (아무것도 하지 않음)
-- 모든 로직을 비동기(async IIFE)로 감싸 `require` 자체는 블로킹하지 않음
-- `process.on('uncaughtException')`으로 최후 방어선 확보
-
-**검증**:
-- `node -e "require('.')"` 실행 시 환경변수 없으면 경고 후 정상 종료
-- 환경변수 설정 + mock 서버 실행 → 등록 성공 메시지 확인
-
----
-
-### Task 6 — INSTRUCTOR_MANUAL.md
-
-**목표**: 강사가 혼자 셋업하고 운영할 수 있는 완전한 가이드
-
-**포함 내용**:
-1. 시스템 구성 개요 (다이어그램)
-2. 강사 서버 최소 구현 예시 (Express.js 코드 포함)
-3. `tests.json` 작성 가이드 및 예시
-4. 학생 등록 확인 방법
-5. 테스트 실행 방법 (curl 또는 강사 서버 API 호출)
-6. FAQ (학생 등록 안 됨, IP 감지 오류 등)
-
-**검증**: 문서만으로 강사 서버를 5분 안에 셋업 가능한지 리뷰
-
----
-
-### Task 7 — 배포 준비
-
-**목표**: npmjs.com 배포 가능 상태
-
-**작업**:
-- `README.md` 작성 (설치, 사용법, 환경변수 표)
-- `.npmignore` 작성 (SPEC.md, tasks/, .env 제외)
-- `npm pack`으로 패키지 내용 확인
-- 버전 `1.0.0` 확인
-
-**검증**:
-- `npm pack --dry-run` → 포함 파일 목록이 의도한 것과 일치
-- `npm publish --dry-run` 오류 없음
-
----
-
-## Checkpoints
-
-| 체크포인트 | 조건 |
-|---|---|
-| CP-1 (Tasks 1-2 후) | config.js가 환경변수를 올바르게 로드/검증하는 것 확인 |
-| CP-2 (Tasks 3-4 후) | mock 서버로 register + heartbeat 동작 확인 |
-| CP-3 (Task 5 후) | `require('.')` 한 줄로 전체 흐름 동작 확인 |
-| CP-4 (Tasks 6-7 후) | `npm pack` 결과 및 메뉴얼 최종 검토 |
-
----
-
-## 구현 순서 (수직 슬라이스)
-
-```
-Task 1 → Task 2 → Task 3 → Task 4 → Task 5 → Task 6 → Task 7
+**검증:**
+```bash
+node -e "const {startHeartbeat}=require('./lib/heartbeat'); console.log('ok')"
 ```
 
-Task 6 (메뉴얼)은 Task 5 이후 독립적으로 작성 가능.
+---
+
+### Task 2: `lib/config.js` — package.json 기반 설정 로드
+
+**변경 파일:** `lib/config.js`
+
+**변경 내용:**
+- `require('dotenv')` 제거
+- `process.cwd() + '/package.json'`을 읽어 `.dsmhs` 키 파싱
+- `studentName`, `instructorUrl` 필수 필드 검증
+- `port`는 `process.env.PORT || 3000` 유지
+- 기존 반환 API(`{ enabled, instructorUrl, studentName, port }`) 완전 동일 유지
+
+**오류 처리:**
+- package.json 없음 → 경고 후 비활성화
+- `dsmhs` 키 없음 → 경고 후 비활성화
+- 필수 필드 누락 → 누락 필드 명시 후 비활성화
+
+---
+
+### Task 3: Dual CJS/ESM 진입점 + `package.json` 업데이트
+
+**변경 파일:** `index.js` → `index.cjs` (rename), `index.mjs` (신규), `package.json`
+
+**index.cjs** — 기존 index.js 내용 그대로 (CJS)
+
+**index.mjs** — ESM 진입점:
+```js
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+// 이하 index.cjs와 동일한 로직
+```
+
+**package.json 변경:**
+```json
+{
+  "main": "index.cjs",
+  "exports": { ".": { "require": "./index.cjs", "import": "./index.mjs" } },
+  "files": ["index.cjs", "index.mjs", "lib/", "INSTRUCTOR_MANUAL.md", "README.md"],
+  "dependencies": {}
+}
+```
+
+**검증:**
+```bash
+node -e "require('.')"
+node --input-type=module --eval "import '.';"
+```
+
+---
+
+### Task 4: `test/config.test.js` 업데이트
+
+**변경 파일:** `test/config.test.js`
+
+**변경 내용:**
+- 환경변수 기반 테스트 → package.json mock 기반으로 전면 교체
+- `fs` mock 또는 `process.cwd()` override 방식으로 테스트
+- 커버 케이스: `dsmhs` 키 없음, 필드 누락, 정상, trailing slash 제거, 포트 기본값
+
+**검증:**
+```bash
+node --test test/config.test.js
+node --test test/*.test.js
+```
+
+---
+
+### ✅ Checkpoint 1: 전체 테스트 통과
+
+```bash
+node --test test/*.test.js
+```
+
+---
+
+### Task 5: `instructor-server/` — Express 서버 + 대시보드
+
+**신규 파일:**
+- `instructor-server/package.json`
+- `instructor-server/server.js`
+- `instructor-server/public/index.html`
+
+**server.js API:**
+
+| Method | Path | 동작 |
+|---|---|---|
+| POST | `/screener/register` | 학생 등록 |
+| POST | `/screener/heartbeat` | `lastSeen` 갱신 |
+| GET | `/screener/students` | 학생 목록 JSON |
+| GET | `/` | 대시보드 HTML 서빙 |
+
+alive 기준: `lastSeen` 기준 10초 이내
+
+**public/index.html:**
+- 순수 HTML + CSS + JS (외부 의존성 없음)
+- 5초마다 `/screener/students` fetch → 카드 업데이트
+- 카드: 이름, IP:포트, 🟢/🔴 상태, 마지막 확인 시각
+
+---
+
+### ✅ Checkpoint 2: `.npmignore` 확인
+
+```bash
+npm pack --dry-run  # instructor-server/ 제외 확인
+```
+
+---
+
+## 구현 순서
+
+```
+Task 1 (heartbeat 5s) → Task 2 (config) → Task 3 (CJS/ESM) → Task 4 (tests)
+    → Checkpoint 1 → Task 5 (instructor-server) → Checkpoint 2
+```
