@@ -1,6 +1,25 @@
-SPEC.md
+# AI 에이전트 설정 및 프롬프트
+.claude/
+CLAUDE.md
+.cursor/
+.copilot/
+.windsurf/
+.github/copilot-instructions.md
+.gemini/
+
+# 개발 계획 및 내부 문서
 tasks/
+SPEC.md
+map.json
+
+# 테스트
+test/
+
+# 환경 변수 및 비밀
 .env
 .env.*
-*.log
+
+# 의존성 및 로그
 node_modules/
+package-lock.json
+*.log
