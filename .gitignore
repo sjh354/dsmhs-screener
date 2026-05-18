@@ -2,6 +2,11 @@
 .claude/
 CLAUDE.md
 
+# 로컬 개발 전용 (git 추적 안 함)
+SPEC.md
+map.json
+tasks/
+
 # 환경 변수 및 비밀
 .env
 .env.*
