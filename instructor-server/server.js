@@ -35,6 +35,33 @@ app.post('/screener/heartbeat', (req, res) => {
   res.json({ ok: true });
 });
 
+// 학생 서버 엔드포인트 프로브 (SSRF 방어: 등록된 학생만 허용)
+app.post('/screener/probe', async (req, res) => {
+  const { studentName, path, method = 'GET', body } = req.body;
+  const student = students.get(studentName);
+  if (!student) return res.status(400).json({ error: 'unknown student' });
+
+  const url = `http://${student.ip}:${student.port}${path}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const fetchRes = await fetch(url, {
+      method,
+      signal: controller.signal,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    clearTimeout(timer);
+    const ok = fetchRes.status >= 200 && fetchRes.status < 300;
+    res.json({ ok, status: fetchRes.status });
+  } catch (err) {
+    clearTimeout(timer);
+    const isTimeout = err.name === 'AbortError';
+    res.json({ ok: false, status: 0, error: isTimeout ? 'timeout' : err.message });
+  }
+});
+
 // 학생 목록 + alive 여부
 app.get('/screener/students', (req, res) => {
   const now = Date.now();
