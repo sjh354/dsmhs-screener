@@ -59,6 +59,70 @@ import 'dsmhs-screener';
 
 `INSTRUCTOR_MANUAL.md` 참고.
 
+---
+
+## 로컬 테스트 환경 (Docker Compose)
+
+단일 PC에서 강사 서버 + 복수 학생을 가상으로 시뮬레이션하는 환경이다.  
+실제 배포 전 heartbeat·등록·오프라인 전환 동작을 빠르게 검증할 때 사용한다.
+
+### 사전 요구사항
+
+- Docker Desktop (또는 Docker Engine + Compose v2)
+
+### 실행
+
+```bash
+# 이미지 빌드 및 전체 컨테이너 시작
+docker compose up --build
+
+# 백그라운드 실행
+docker compose up --build -d
+```
+
+브라우저에서 `http://localhost:4000` 접속 → 강사 대시보드 확인.
+
+### 네트워크 구성
+
+| 컨테이너 | IP | 역할 |
+|---|---|---|
+| `instructor` | `172.28.0.10` | 강사 서버 (포트 4000) |
+| `student-a` | `172.28.0.11` | 학생 A |
+| `student-b` | `172.28.0.12` | 학생 B |
+| `student-c` | `172.28.0.13` | 학생 C |
+
+### 주요 시나리오
+
+```bash
+# 특정 학생 컨테이너 중지 → 대시보드에서 오프라인 전환 확인 (약 10초)
+docker compose stop student-a
+
+# 재시작 → 자동 재등록 확인
+docker compose start student-a
+
+# 전체 종료
+docker compose down
+```
+
+### 학생 수 변경
+
+`docker-compose.yml`에 서비스 블록을 추가하고 고유한 IP를 할당한다:
+
+```yaml
+student-d:
+  build:
+    context: .
+    dockerfile: docker/student.Dockerfile
+  environment:
+    STUDENT_NAME: student-d
+    INSTRUCTOR_URL: http://instructor:4000
+  depends_on:
+    - instructor
+  networks:
+    classroom:
+      ipv4_address: 172.28.0.14
+```
+
 ## 라이선스
 
 MIT

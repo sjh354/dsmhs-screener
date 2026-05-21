@@ -1,0 +1,10 @@
+node_modules
+.git
+.claude
+CLAUDE.md
+SPEC.md
+map.json
+tasks/
+test/
+*.log
+.DS_Store

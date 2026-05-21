@@ -6,9 +6,6 @@ CLAUDE.md
 SPEC.md
 map.json
 tasks/
-docker-compose.yml
-docker/
-.dockerignore
 
 # 환경 변수 및 비밀
 .env
