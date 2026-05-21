@@ -46,11 +46,6 @@ app.get('/screener/students', (req, res) => {
   res.json(list);
 });
 
-// 대시보드
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 app.listen(PORT, () => {
   console.log(`[dsmhs-instructor] 강사 서버 실행 중 → http://localhost:${PORT}`);
 });
