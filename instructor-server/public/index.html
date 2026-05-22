@@ -126,6 +126,7 @@
     let students = [];
     // probeResults[studentName][endpointIdx] = 'ok' | 'fail' | 'pending' | 'skip'
     let probeResults = {};
+    let probeGen = 0;
 
     function epLabel(ep) { return `${ep.method} ${ep.path}`; }
 
@@ -195,12 +196,15 @@
     }
 
     async function probeAll() {
+      const gen = ++probeGen;
       const targets = students.filter(s => s.alive);
+      targets.forEach(s => {
+        if (!(s.name in probeResults)) probeResults[s.name] = {};
+        endpoints.forEach((_, i) => { probeResults[s.name][i] = 'pending'; });
+      });
+      render();
       await Promise.all(targets.flatMap(s =>
         endpoints.map(async (ep, i) => {
-          if (!(s.name in probeResults)) probeResults[s.name] = {};
-          probeResults[s.name][i] = 'pending';
-          render();
           try {
             const res = await fetch('/screener/probe', {
               method: 'POST',
@@ -208,8 +212,10 @@
               body: JSON.stringify({ studentName: s.name, path: ep.path, method: ep.method, body: ep.body }),
             });
             const data = await res.json();
+            if (gen !== probeGen) return;
             probeResults[s.name][i] = data.ok ? 'ok' : 'fail';
           } catch {
+            if (gen !== probeGen) return;
             probeResults[s.name][i] = 'fail';
           }
           render();
