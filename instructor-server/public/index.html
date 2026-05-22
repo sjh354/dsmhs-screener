@@ -3,82 +3,231 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DSMHS 학생 현황</title>
+  <title>DSMHS 엔드포인트 테스트</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; display: flex; flex-direction: column; height: 100vh; }
+
     header {
-      background: #2563eb; color: #fff; padding: 16px 24px;
-      display: flex; align-items: center; justify-content: space-between;
+      background: #2563eb; color: #fff; padding: 12px 20px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      flex-shrink: 0;
     }
-    header h1 { font-size: 1.2rem; font-weight: 600; }
-    #refresh-info { font-size: 0.8rem; opacity: 0.8; }
-    main { padding: 24px; }
-    #stats { margin-bottom: 16px; font-size: 0.9rem; color: #555; }
-    #grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 16px;
+    header h1 { font-size: 1.1rem; font-weight: 600; white-space: nowrap; }
+    #refresh-info { font-size: 0.8rem; opacity: 0.8; white-space: nowrap; }
+
+    #add-form { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+    #add-form select, #add-form input {
+      padding: 4px 8px; border: none; border-radius: 4px;
+      font-size: 0.85rem; background: rgba(255,255,255,0.15); color: #fff;
     }
-    .card {
-      background: #fff; border-radius: 10px; padding: 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.08);
-      border-left: 4px solid #e5e7eb;
-      transition: border-color .2s;
+    #add-form select option { background: #1d4ed8; }
+    #add-form input::placeholder { color: rgba(255,255,255,0.6); }
+    #add-form button {
+      padding: 4px 12px; border: none; border-radius: 4px;
+      background: #fff; color: #2563eb; font-weight: 600;
+      cursor: pointer; font-size: 0.85rem;
     }
-    .card.alive { border-left-color: #22c55e; }
-    .card.offline { border-left-color: #ef4444; }
-    .card-name { font-weight: 600; font-size: 1rem; margin-bottom: 6px; }
-    .card-addr { font-size: 0.8rem; color: #666; margin-bottom: 8px; font-family: monospace; }
-    .card-status { font-size: 0.85rem; margin-bottom: 4px; }
-    .card-time { font-size: 0.75rem; color: #999; }
+    #add-form button:hover { background: #dbeafe; }
+
+    #stats { padding: 8px 20px; font-size: 0.85rem; color: #555; flex-shrink: 0; }
+
+    #table-wrap { flex: 1; overflow: auto; padding: 0 20px 20px; }
+
+    table { border-collapse: collapse; min-width: 100%; white-space: nowrap; }
+
+    thead th {
+      position: sticky; top: 0; z-index: 2;
+      background: #1e40af; color: #fff;
+      padding: 10px 14px; font-size: 0.8rem; font-weight: 600;
+      border-right: 1px solid #3b82f6;
+    }
+    thead th:first-child {
+      position: sticky; left: 0; z-index: 3;
+      min-width: 180px;
+    }
+    thead th .del-btn {
+      margin-left: 6px; cursor: pointer; opacity: 0.6;
+      font-size: 0.75rem; font-weight: 400;
+    }
+    thead th .del-btn:hover { opacity: 1; }
+
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    tbody tr:hover { background: #eff6ff; }
+
+    tbody td {
+      padding: 10px 14px; border-right: 1px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb; font-size: 0.85rem; text-align: center;
+    }
+    tbody td:first-child {
+      position: sticky; left: 0; z-index: 1;
+      background: inherit; text-align: left;
+      font-weight: 600; min-width: 180px;
+      border-right: 2px solid #93c5fd;
+    }
+    .student-ip { font-size: 0.75rem; font-weight: 400; color: #6b7280; font-family: monospace; }
+    .badge { font-size: 0.7rem; padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+    .badge-alive { background: #dcfce7; color: #16a34a; }
+    .badge-offline { background: #fee2e2; color: #dc2626; }
+
+    .cell-ok { background: #22c55e; color: #fff; font-weight: 700; border-radius: 4px; padding: 4px 10px; }
+    .cell-fail { background: #ef4444; color: #fff; font-weight: 700; border-radius: 4px; padding: 4px 10px; }
+    .cell-skip { background: #d1d5db; color: #6b7280; border-radius: 4px; padding: 4px 10px; }
+    .cell-pending { background: #e5e7eb; color: #9ca3af; border-radius: 4px; padding: 4px 10px; animation: blink 1s infinite; }
+
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
     #empty { display: none; text-align: center; color: #aaa; padding: 60px 0; font-size: 1rem; }
   </style>
 </head>
 <body>
   <header>
-    <h1>DSMHS 학생 현황 대시보드</h1>
+    <h1>DSMHS 엔드포인트 테스트</h1>
     <span id="refresh-info">5초마다 자동 갱신</span>
+    <div id="add-form">
+      <select id="sel-method">
+        <option>GET</option><option>POST</option>
+        <option>PUT</option><option>PATCH</option><option>DELETE</option>
+      </select>
+      <input id="inp-path" type="text" placeholder="/path" style="width:120px">
+      <input id="inp-body" type="text" placeholder='body JSON (선택)' style="width:160px">
+      <button onclick="addEndpoint()">+ 추가</button>
+    </div>
   </header>
-  <main>
-    <p id="stats"></p>
-    <div id="grid"></div>
+
+  <p id="stats"></p>
+  <div id="table-wrap">
+    <table id="tbl">
+      <thead><tr id="hdr-row"></tr></thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
     <p id="empty">등록된 학생이 없습니다.</p>
-  </main>
+  </div>
 
   <script>
-    async function refresh() {
-      const res = await fetch('/screener/students');
-      const students = await res.json();
+    const STORAGE_KEY = 'dsmhs_endpoints';
+    const DEFAULT_ENDPOINTS = [
+      { method: 'GET',    path: '/health',   body: null },
+      { method: 'GET',    path: '/memos',    body: null },
+      { method: 'GET',    path: '/memos/1',  body: null },
+      { method: 'POST',   path: '/memos',    body: { title: 'test', content: 'test' } },
+      { method: 'DELETE', path: '/memos/1',  body: null },
+    ];
 
-      const grid = document.getElementById('grid');
+    function loadEndpoints() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [...DEFAULT_ENDPOINTS];
+      } catch { return [...DEFAULT_ENDPOINTS]; }
+    }
+    function saveEndpoints() { localStorage.setItem(STORAGE_KEY, JSON.stringify(endpoints)); }
+
+    let endpoints = loadEndpoints();
+    let students = [];
+    // probeResults[studentName][endpointIdx] = 'ok' | 'fail' | 'pending' | 'skip'
+    let probeResults = {};
+
+    function epLabel(ep) { return `${ep.method} ${ep.path}`; }
+
+    function addEndpoint() {
+      const method = document.getElementById('sel-method').value;
+      const path = document.getElementById('inp-path').value.trim();
+      const bodyStr = document.getElementById('inp-body').value.trim();
+      if (!path) return;
+      let body = null;
+      if (bodyStr) { try { body = JSON.parse(bodyStr); } catch { alert('body가 유효한 JSON이 아닙니다.'); return; } }
+      endpoints.push({ method, path, body });
+      saveEndpoints();
+      document.getElementById('inp-path').value = '';
+      document.getElementById('inp-body').value = '';
+      render();
+      probeAll();
+    }
+
+    function removeEndpoint(idx) {
+      endpoints.splice(idx, 1);
+      saveEndpoints();
+      render();
+    }
+
+    function render() {
+      const hdr = document.getElementById('hdr-row');
+      const tbody = document.getElementById('tbl-body');
       const empty = document.getElementById('empty');
       const stats = document.getElementById('stats');
 
       const alive = students.filter(s => s.alive).length;
-      stats.textContent = `총 ${students.length}명 중 🟢 ${alive}명 접속 중`;
+      stats.textContent = `총 ${students.length}명 | 접속 중 ${alive}명`;
+
+      // 헤더
+      hdr.innerHTML = '<th>학생</th>' + endpoints.map((ep, i) =>
+        `<th>${epLabel(ep)} <span class="del-btn" onclick="removeEndpoint(${i})" title="삭제">×</span></th>`
+      ).join('');
 
       if (students.length === 0) {
-        grid.innerHTML = '';
+        tbody.innerHTML = '';
         empty.style.display = 'block';
         return;
       }
       empty.style.display = 'none';
 
-      grid.innerHTML = students
+      tbody.innerHTML = [...students]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(s => {
           const addr = s.port ? `${s.ip}:${s.port}` : s.ip;
-          const timeStr = new Date(s.lastSeenIso).toLocaleTimeString('ko-KR');
-          return `
-            <div class="card ${s.alive ? 'alive' : 'offline'}">
-              <div class="card-name">${s.name}</div>
-              <div class="card-addr">${addr}</div>
-              <div class="card-status">${s.alive ? '🟢 접속 중' : '🔴 오프라인'}</div>
-              <div class="card-time">마지막 확인: ${timeStr}</div>
-            </div>`;
+          const badge = s.alive
+            ? '<span class="badge badge-alive">접속 중</span>'
+            : '<span class="badge badge-offline">오프라인</span>';
+          const cells = endpoints.map((ep, i) => {
+            const state = (probeResults[s.name] || {})[i];
+            if (!s.alive || state === 'skip' || state === undefined && !s.alive)
+              return '<td><span class="cell-skip">—</span></td>';
+            if (state === 'pending' || state === undefined)
+              return '<td><span class="cell-pending">…</span></td>';
+            if (state === 'ok') return '<td><span class="cell-ok">O</span></td>';
+            return '<td><span class="cell-fail">X</span></td>';
+          }).join('');
+          return `<tr>
+            <td><div>${s.name}${badge}</div><div class="student-ip">${addr}</div></td>
+            ${cells}
+          </tr>`;
+        }).join('');
+    }
+
+    async function probeAll() {
+      const targets = students.filter(s => s.alive);
+      await Promise.all(targets.flatMap(s =>
+        endpoints.map(async (ep, i) => {
+          if (!(s.name in probeResults)) probeResults[s.name] = {};
+          probeResults[s.name][i] = 'pending';
+          render();
+          try {
+            const res = await fetch('/screener/probe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ studentName: s.name, path: ep.path, method: ep.method, body: ep.body }),
+            });
+            const data = await res.json();
+            probeResults[s.name][i] = data.ok ? 'ok' : 'fail';
+          } catch {
+            probeResults[s.name][i] = 'fail';
+          }
+          render();
         })
-        .join('');
+      ));
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch('/screener/students');
+        students = await res.json();
+        // 오프라인 학생 결과 skip 처리
+        students.forEach(s => {
+          if (!s.alive) probeResults[s.name] = {};
+        });
+        render();
+        await probeAll();
+      } catch { /* 네트워크 오류 무시 */ }
     }
 
     refresh();
