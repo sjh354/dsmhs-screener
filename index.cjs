@@ -1,4 +1,4 @@
-// dsmhs-screener: require 한 줄로 강사 서버 자동 등록 + heartbeat 시작
+// dsmhs-screener: require 한 줄로 강사 서버 자동 등록 + 자가진단 시작
 'use strict';
 
 const config = require('./lib/config');
@@ -9,13 +9,13 @@ if (!config.enabled) {
 }
 
 const { register } = require('./lib/register');
-const { startHeartbeat } = require('./lib/heartbeat');
+const { startReporter } = require('./lib/heartbeat');
 
 // 비동기 IIFE: require 자체를 블로킹하지 않음
 (async () => {
   try {
     await register(config);
-    startHeartbeat(config);
+    startReporter(config);
   } catch {
     // 이미 각 모듈에서 처리됨
   }

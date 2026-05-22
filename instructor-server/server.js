@@ -5,10 +5,20 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const ALIVE_MS = 10000; // heartbeat 5s × 2 여유
+const ALIVE_MS = 10000; // report 5s × 2 여유
 
-// 학생 데이터 메모리 저장 { name → { name, ip, port, lastSeen } }
+// 학생 데이터 메모리 저장 { name → { name, ip, port, lastSeen, probeResults } }
 const students = new Map();
+
+// 강사가 관리하는 엔드포인트 목록 (서버 재시작 시 기본값으로 초기화)
+const DEFAULT_ENDPOINTS = [
+  { label: 'GET /health',     method: 'GET',    path: '/health',   body: null },
+  { label: 'GET /memos',      method: 'GET',    path: '/memos',    body: null },
+  { label: 'GET /memos/1',    method: 'GET',    path: '/memos/1',  body: null },
+  { label: 'POST /memos',     method: 'POST',   path: '/memos',    body: { title: 'test', content: 'test' } },
+  { label: 'DELETE /memos/1', method: 'DELETE', path: '/memos/1',  body: null },
+];
+let endpoints = [...DEFAULT_ENDPOINTS];
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -17,60 +27,63 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/screener/register', (req, res) => {
   const { name, ip, port } = req.body;
   if (!name || !ip) return res.status(400).json({ error: 'name, ip 필수' });
-  students.set(name, { name, ip, port, lastSeen: Date.now() });
+  students.set(name, { name, ip, port, lastSeen: Date.now(), probeResults: {} });
   res.json({ ok: true });
 });
 
-// heartbeat 수신
-app.post('/screener/heartbeat', (req, res) => {
-  const { name } = req.body;
+// 학생 자가진단 결과 수신 (lastSeen 갱신 포함)
+app.post('/screener/report', (req, res) => {
+  const { name, results } = req.body;
   if (!name) return res.status(400).json({ error: 'name 필수' });
   const student = students.get(name);
   if (student) {
     student.lastSeen = Date.now();
+    if (results && typeof results === 'object') student.probeResults = results;
   } else {
-    // 서버 재시작 후 heartbeat만 들어오는 경우 재등록
-    students.set(name, { name, ip: req.ip, port: null, lastSeen: Date.now() });
+    students.set(name, { name, ip: req.ip, port: null, lastSeen: Date.now(), probeResults: results || {} });
   }
   res.json({ ok: true });
 });
 
-// 학생 서버 엔드포인트 프로브 (SSRF 방어: 등록된 학생만 허용)
-app.post('/screener/probe', async (req, res) => {
-  const { studentName, path, method = 'GET', body } = req.body;
-  const student = students.get(studentName);
-  if (!student) return res.status(400).json({ error: 'unknown student' });
-
-  const url = `http://${student.ip}:${student.port}${path}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3000);
-
-  try {
-    const fetchRes = await fetch(url, {
-      method,
-      signal: controller.signal,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    clearTimeout(timer);
-    const ok = fetchRes.status >= 200 && fetchRes.status < 300;
-    res.json({ ok, status: fetchRes.status });
-  } catch (err) {
-    clearTimeout(timer);
-    const isTimeout = err.name === 'AbortError';
-    res.json({ ok: false, status: 0, error: isTimeout ? 'timeout' : err.message });
-  }
-});
-
-// 학생 목록 + alive 여부
+// 학생 목록 + alive 여부 + probeResults
 app.get('/screener/students', (req, res) => {
   const now = Date.now();
   const list = Array.from(students.values()).map((s) => ({
-    ...s,
+    name: s.name,
+    ip: s.ip,
+    port: s.port,
     alive: now - s.lastSeen <= ALIVE_MS,
     lastSeenIso: new Date(s.lastSeen).toISOString(),
+    probeResults: s.probeResults,
   }));
   res.json(list);
+});
+
+// 엔드포인트 목록 반환
+app.get('/screener/endpoints', (req, res) => {
+  res.json(endpoints);
+});
+
+// 엔드포인트 추가 (label 중복 거부)
+app.post('/screener/endpoints', (req, res) => {
+  const { method, path: epPath, body = null } = req.body;
+  if (!method || !epPath) return res.status(400).json({ error: 'method, path 필수' });
+  const label = `${method} ${epPath}`;
+  if (endpoints.some((e) => e.label === label)) {
+    return res.status(409).json({ error: '이미 존재하는 엔드포인트입니다.' });
+  }
+  endpoints.push({ label, method, path: epPath, body });
+  res.json({ ok: true, endpoints });
+});
+
+// 엔드포인트 삭제 (인덱스 기반)
+app.delete('/screener/endpoints/:idx', (req, res) => {
+  const idx = parseInt(req.params.idx, 10);
+  if (isNaN(idx) || idx < 0 || idx >= endpoints.length) {
+    return res.status(400).json({ error: '유효하지 않은 인덱스' });
+  }
+  endpoints.splice(idx, 1);
+  res.json({ ok: true, endpoints });
 });
 
 app.listen(PORT, () => {
