@@ -59,6 +59,10 @@ import 'dsmhs-screener';
 
 `INSTRUCTOR_MANUAL.md` 참고.
 
+## 강사 서버 호스팅
+
+강사 서버를 개인 서버나 클라우드에 배포하는 방법은 [`deploy/instructor` 브랜치](../../tree/deploy/instructor)의 `README.md`를 참고한다.
+
 ---
 
 ## 로컬 테스트 환경 (Docker Compose)
