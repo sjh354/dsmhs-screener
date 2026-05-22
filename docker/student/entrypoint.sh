@@ -6,6 +6,7 @@ cat > /app/package.json <<EOF
   "name": "${STUDENT_NAME}-app",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "dsmhs": {
     "studentName": "${STUDENT_NAME}",
     "instructorUrl": "${INSTRUCTOR_URL}"
@@ -13,4 +14,4 @@ cat > /app/package.json <<EOF
 }
 EOF
 
-exec node /app/app.js
+exec node /app/server.js
