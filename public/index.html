@@ -16,6 +16,12 @@
     header h1 { font-size: 1.1rem; font-weight: 600; white-space: nowrap; }
     #refresh-info { font-size: 0.8rem; opacity: 0.8; white-space: nowrap; }
 
+    #roster-btn {
+      padding: 4px 12px; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px;
+      background: transparent; color: #fff; font-size: 0.85rem; cursor: pointer;
+      white-space: nowrap;
+    }
+    #roster-btn:hover { background: rgba(255,255,255,0.15); }
     #add-form { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-wrap: wrap; }
     #add-form select, #add-form input {
       padding: 4px 8px; border: none; border-radius: 4px;
@@ -69,6 +75,7 @@
     .badge { font-size: 0.7rem; padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
     .badge-alive { background: #dcfce7; color: #16a34a; }
     .badge-offline { background: #fee2e2; color: #dc2626; }
+    .badge-unregistered { background: #f3f4f6; color: #9ca3af; }
 
     .cell-ok { background: #22c55e; color: #fff; font-weight: 700; border-radius: 4px; padding: 4px 10px; }
     .cell-fail { background: #ef4444; color: #fff; font-weight: 700; border-radius: 4px; padding: 4px 10px; }
@@ -137,6 +144,8 @@
   <header>
     <h1>DSMHS 엔드포인트 테스트</h1>
     <span id="refresh-info">5초마다 자동 갱신</span>
+    <button id="roster-btn" onclick="document.getElementById('roster-file').click()">명단 불러오기</button>
+    <input id="roster-file" type="file" accept=".json" style="display:none" onchange="loadRoster(this)">
     <div id="add-form">
       <select id="sel-method">
         <option>GET</option><option>POST</option>
@@ -160,6 +169,33 @@
   <script>
     let endpoints = [];
     let students = [];
+
+    async function loadRoster(input) {
+      const file = input.files[0];
+      if (!file) return;
+      input.value = '';
+      let names;
+      try {
+        const text = await file.text();
+        names = JSON.parse(text);
+        if (!Array.isArray(names) || names.some(n => typeof n !== 'string')) throw new Error();
+      } catch {
+        alert('올바른 형식의 JSON 파일이 아닙니다.\n예: ["홍길동", "김철수"]');
+        return;
+      }
+      try {
+        const res = await fetch('/screener/roster', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ names }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('roster-btn').textContent = `명단 ${data.count}명`;
+          await refresh();
+        }
+      } catch { alert('명단 업로드에 실패했습니다.'); }
+    }
 
     async function addEndpoint() {
       const method = document.getElementById('sel-method').value;
@@ -200,7 +236,9 @@
       const stats = document.getElementById('stats');
 
       const alive = students.filter(s => s.alive).length;
-      stats.textContent = `총 ${students.length}명 | 접속 중 ${alive}명`;
+      const unregistered = students.filter(s => !s.registered).length;
+      stats.textContent = `총 ${students.length}명 | 접속 중 ${alive}명` +
+        (unregistered ? ` | 미접속 ${unregistered}명` : '');
 
       hdr.innerHTML = '<th>학생</th>' + endpoints.map((ep, i) =>
         `<th>${ep.label} <span class="del-btn" onclick="removeEndpoint(${i})" title="삭제">×</span></th>`
@@ -216,10 +254,12 @@
       tbody.innerHTML = [...students]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(s => {
-          const addr = s.port ? `${s.ip}:${s.port}` : s.ip;
+          const addr = s.port ? `${s.ip}:${s.port}` : (s.ip || '');
           const badge = s.alive
             ? '<span class="badge badge-alive">접속 중</span>'
-            : '<span class="badge badge-offline">오프라인</span>';
+            : s.registered
+              ? '<span class="badge badge-offline">오프라인</span>'
+              : '<span class="badge badge-unregistered">미접속</span>';
           const cells = endpoints.map(ep => {
             if (!s.alive) return '<td><span class="cell-skip">—</span></td>';
             const result = (s.probeResults || {})[ep.label];
