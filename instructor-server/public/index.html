@@ -16,25 +16,13 @@
     header h1 { font-size: 1.1rem; font-weight: 600; white-space: nowrap; }
     #refresh-info { font-size: 0.8rem; opacity: 0.8; white-space: nowrap; }
 
-    #roster-btn {
+    #config-btn {
+      margin-left: auto;
       padding: 4px 12px; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px;
       background: transparent; color: #fff; font-size: 0.85rem; cursor: pointer;
       white-space: nowrap;
     }
-    #roster-btn:hover { background: rgba(255,255,255,0.15); }
-    #add-form { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-wrap: wrap; }
-    #add-form select, #add-form input {
-      padding: 4px 8px; border: none; border-radius: 4px;
-      font-size: 0.85rem; background: rgba(255,255,255,0.15); color: #fff;
-    }
-    #add-form select option { background: #1d4ed8; }
-    #add-form input::placeholder { color: rgba(255,255,255,0.6); }
-    #add-form button {
-      padding: 4px 12px; border: none; border-radius: 4px;
-      background: #fff; color: #2563eb; font-weight: 600;
-      cursor: pointer; font-size: 0.85rem;
-    }
-    #add-form button:hover { background: #dbeafe; }
+    #config-btn:hover { background: rgba(255,255,255,0.15); }
 
     #stats { padding: 8px 20px; font-size: 0.85rem; color: #555; flex-shrink: 0; }
 
@@ -52,11 +40,6 @@
       position: sticky; left: 0; z-index: 3;
       min-width: 180px;
     }
-    thead th .del-btn {
-      margin-left: 6px; cursor: pointer; opacity: 0.6;
-      font-size: 0.75rem; font-weight: 400;
-    }
-    thead th .del-btn:hover { opacity: 1; }
 
     tbody tr:nth-child(even) { background: #f8fafc; }
     tbody tr:hover { background: #eff6ff; }
@@ -144,17 +127,8 @@
   <header>
     <h1>DSMHS 엔드포인트 테스트</h1>
     <span id="refresh-info">5초마다 자동 갱신</span>
-    <button id="roster-btn" onclick="document.getElementById('roster-file').click()">명단 불러오기</button>
-    <input id="roster-file" type="file" accept=".json" style="display:none" onchange="loadRoster(this)">
-    <div id="add-form">
-      <select id="sel-method">
-        <option>GET</option><option>POST</option>
-        <option>PUT</option><option>PATCH</option><option>DELETE</option>
-      </select>
-      <input id="inp-path" type="text" placeholder="/path" style="width:120px">
-      <input id="inp-body" type="text" placeholder='body JSON (선택)' style="width:160px">
-      <button onclick="addEndpoint()">+ 추가</button>
-    </div>
+    <button id="config-btn" onclick="document.getElementById('config-file').click()">수업 설정 불러오기</button>
+    <input id="config-file" type="file" accept=".json" style="display:none" onchange="loadConfig(this)">
   </header>
 
   <p id="stats"></p>
@@ -163,70 +137,38 @@
       <thead><tr id="hdr-row"></tr></thead>
       <tbody id="tbl-body"></tbody>
     </table>
-    <p id="empty">등록된 학생이 없습니다.</p>
+    <p id="empty">수업 설정 파일을 불러오세요.</p>
   </div>
 
   <script>
     let endpoints = [];
     let students = [];
 
-    async function loadRoster(input) {
+    async function loadConfig(input) {
       const file = input.files[0];
       if (!file) return;
       input.value = '';
-      let names;
+      let config;
       try {
         const text = await file.text();
-        names = JSON.parse(text);
-        if (!Array.isArray(names) || names.some(n => typeof n !== 'string')) throw new Error();
+        config = JSON.parse(text);
+        if (!Array.isArray(config.students) || !Array.isArray(config.endpoints)) throw new Error();
       } catch {
-        alert('올바른 형식의 JSON 파일이 아닙니다.\n예: ["홍길동", "김철수"]');
+        alert('올바른 형식의 JSON 파일이 아닙니다.\n예:\n{\n  "students": ["홍길동", "김철수"],\n  "endpoints": [{"method": "GET", "path": "/health"}]\n}');
         return;
       }
       try {
-        const res = await fetch('/screener/roster', {
+        const res = await fetch('/screener/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ names }),
+          body: JSON.stringify(config),
         });
         const data = await res.json();
-        if (data.ok) {
-          document.getElementById('roster-btn').textContent = `명단 ${data.count}명`;
-          await refresh();
-        }
-      } catch { alert('명단 업로드에 실패했습니다.'); }
-    }
-
-    async function addEndpoint() {
-      const method = document.getElementById('sel-method').value;
-      const path = document.getElementById('inp-path').value.trim();
-      const bodyStr = document.getElementById('inp-body').value.trim();
-      if (!path) return;
-      let body = null;
-      if (bodyStr) { try { body = JSON.parse(bodyStr); } catch { alert('body가 유효한 JSON이 아닙니다.'); return; } }
-
-      try {
-        const res = await fetch('/screener/endpoints', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ method, path, body }),
-        });
-        if (res.status === 409) { alert('이미 존재하는 엔드포인트입니다.'); return; }
-        const data = await res.json();
-        endpoints = data.endpoints;
-        document.getElementById('inp-path').value = '';
-        document.getElementById('inp-body').value = '';
-        render();
-      } catch { /* 네트워크 오류 무시 */ }
-    }
-
-    async function removeEndpoint(idx) {
-      try {
-        const res = await fetch(`/screener/endpoints/${idx}`, { method: 'DELETE' });
-        const data = await res.json();
-        endpoints = data.endpoints;
-        render();
-      } catch { /* 네트워크 오류 무시 */ }
+        if (!res.ok) { alert(data.error || '설정 업로드 실패'); return; }
+        document.getElementById('config-btn').textContent =
+          `설정 완료 (학생 ${data.studentCount}명 · 엔드포인트 ${data.endpointCount}개)`;
+        await refresh();
+      } catch { alert('설정 업로드에 실패했습니다.'); }
     }
 
     function render() {
@@ -240,8 +182,8 @@
       stats.textContent = `총 ${students.length}명 | 접속 중 ${alive}명` +
         (unregistered ? ` | 미접속 ${unregistered}명` : '');
 
-      hdr.innerHTML = '<th>학생</th>' + endpoints.map((ep, i) =>
-        `<th>${ep.label} <span class="del-btn" onclick="removeEndpoint(${i})" title="삭제">×</span></th>`
+      hdr.innerHTML = '<th>학생</th>' + endpoints.map(ep =>
+        `<th>${ep.label}</th>`
       ).join('');
 
       if (students.length === 0) {
