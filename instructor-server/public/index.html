@@ -16,13 +16,14 @@
     header h1 { font-size: 1.1rem; font-weight: 600; white-space: nowrap; }
     #refresh-info { font-size: 0.8rem; opacity: 0.8; white-space: nowrap; }
 
-    #config-btn {
+    .header-btn {
       margin-left: auto;
       padding: 4px 12px; border: 1px solid rgba(255,255,255,0.5); border-radius: 4px;
       background: transparent; color: #fff; font-size: 0.85rem; cursor: pointer;
       white-space: nowrap;
     }
-    #config-btn:hover { background: rgba(255,255,255,0.15); }
+    .header-btn:hover { background: rgba(255,255,255,0.15); }
+    #config-btn { margin-left: auto; }
 
     #stats { padding: 8px 20px; font-size: 0.85rem; color: #555; flex-shrink: 0; }
 
@@ -127,7 +128,8 @@
   <header>
     <h1>DSMHS 엔드포인트 테스트</h1>
     <span id="refresh-info">5초마다 자동 갱신</span>
-    <button id="config-btn" onclick="document.getElementById('config-file').click()">수업 설정 불러오기</button>
+    <button id="download-btn" class="header-btn" onclick="downloadConfig()">현재 설정 다운로드</button>
+    <button id="config-btn" class="header-btn" onclick="document.getElementById('config-file').click()">수업 설정 불러오기</button>
     <input id="config-file" type="file" accept=".json" style="display:none" onchange="loadConfig(this)">
   </header>
 
@@ -143,6 +145,20 @@
   <script>
     let endpoints = [];
     let students = [];
+
+    async function downloadConfig() {
+      try {
+        const res = await fetch('/screener/config');
+        const config = await res.json();
+        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'class-config.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch { alert('설정 다운로드에 실패했습니다.'); }
+    }
 
     async function loadConfig(input) {
       const file = input.files[0];

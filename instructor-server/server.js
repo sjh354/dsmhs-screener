@@ -89,6 +89,14 @@ app.get('/screener/students', (req, res) => {
   res.json(Array.from(registered.values()));
 });
 
+// 현재 수업 설정 반환 (다운로드용)
+app.get('/screener/config', (req, res) => {
+  res.json({
+    students: roster,
+    endpoints: endpoints.map((e) => ({ method: e.method, path: e.path, body: e.body ?? undefined })),
+  });
+});
+
 // 엔드포인트 목록 반환 (학생 npm 패키지가 사용)
 app.get('/screener/endpoints', (req, res) => {
   res.json(endpoints);
