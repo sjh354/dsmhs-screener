@@ -1,0 +1,12 @@
+{
+  "students": ["김민준", "이서연", "박도윤", "최지아", "정하준"],
+  "endpoints": [
+    { "method": "GET", "path": "/health" },
+    { "method": "GET", "path": "/hello" },
+    { "method": "GET", "path": "/hello/홍길동" },
+    { "method": "GET", "path": "/time" },
+    { "method": "GET", "path": "/random" },
+    { "method": "GET", "path": "/memos" },
+    { "method": "GET", "path": "/memos/0" }
+  ]
+}
