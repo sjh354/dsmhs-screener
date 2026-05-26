@@ -32,10 +32,16 @@ function makeInstructorServer(endpoints = [{ label: 'GET /health', method: 'GET'
   });
 }
 
-// 학생 앱 역할: 지정 경로에 200 또는 404 반환
-function makeStudentServer({ healthStatus = 200 } = {}) {
+// 학생 앱 역할: { healthStatus } 또는 { routes: { '/path': statusCode } } 옵션 지원
+function makeStudentServer({ healthStatus = 200, routes = null } = {}) {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
+      if (routes) {
+        const status = routes[req.url];
+        res.writeHead(status ?? 404);
+        res.end();
+        return;
+      }
       if (req.url === '/health') {
         res.writeHead(healthStatus);
         res.end();
@@ -141,5 +147,57 @@ describe('reporter (startReporter)', () => {
     await new Promise((r) => setTimeout(r, 300));
 
     clearInterval(timer);
+  });
+
+  test('reports ok: true for 404 when okStatus includes 404', async () => {
+    const endpoints = [{ label: 'DELETE /memos/999', method: 'DELETE', path: '/memos/999', body: null, okStatus: [200, 404] }];
+    const instructor = await makeInstructorServer(endpoints);
+    const student = await makeStudentServer({ routes: { '/memos/999': 404 } });
+    const instructorPort = instructor.address().port;
+    const studentPort = student.address().port;
+
+    mock.timers.enable(['setInterval']);
+    const { startReporter } = require('../lib/heartbeat');
+    const timer = startReporter(
+      { instructorUrl: `http://127.0.0.1:${instructorPort}`, studentName: '테스트학생', port: studentPort },
+      30000
+    );
+
+    mock.timers.tick(30000);
+    mock.timers.reset();
+    await new Promise((r) => setTimeout(r, 500));
+
+    clearInterval(timer);
+    instructor.close();
+    student.close();
+
+    assert.equal(instructor.reports.length, 1);
+    assert.equal(instructor.reports[0].results['DELETE /memos/999'].ok, true);
+  });
+
+  test('reports ok: false for 404 when okStatus is not set', async () => {
+    const endpoints = [{ label: 'DELETE /memos/999', method: 'DELETE', path: '/memos/999', body: null }];
+    const instructor = await makeInstructorServer(endpoints);
+    const student = await makeStudentServer({ routes: { '/memos/999': 404 } });
+    const instructorPort = instructor.address().port;
+    const studentPort = student.address().port;
+
+    mock.timers.enable(['setInterval']);
+    const { startReporter } = require('../lib/heartbeat');
+    const timer = startReporter(
+      { instructorUrl: `http://127.0.0.1:${instructorPort}`, studentName: '테스트학생', port: studentPort },
+      30000
+    );
+
+    mock.timers.tick(30000);
+    mock.timers.reset();
+    await new Promise((r) => setTimeout(r, 500));
+
+    clearInterval(timer);
+    instructor.close();
+    student.close();
+
+    assert.equal(instructor.reports.length, 1);
+    assert.equal(instructor.reports[0].results['DELETE /memos/999'].ok, false);
   });
 });

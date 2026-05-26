@@ -31,6 +31,7 @@ app.post('/screener/config', (req, res) => {
     method: e.method,
     path: e.path,
     body: e.body ?? null,
+    okStatus: e.okStatus ?? null,
   }));
   res.json({ ok: true, studentCount: roster.length, endpointCount: endpoints.length });
 });
@@ -93,7 +94,12 @@ app.get('/screener/students', (req, res) => {
 app.get('/screener/config', (req, res) => {
   res.json({
     students: roster,
-    endpoints: endpoints.map((e) => ({ method: e.method, path: e.path, body: e.body ?? undefined })),
+    endpoints: endpoints.map((e) => ({
+      method: e.method,
+      path: e.path,
+      ...(e.body != null && { body: e.body }),
+      ...(e.okStatus != null && { okStatus: e.okStatus }),
+    })),
   });
 });
 
